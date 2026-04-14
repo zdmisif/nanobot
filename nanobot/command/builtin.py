@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import signal
 import sys
 
 from nanobot import __version__
@@ -29,6 +30,22 @@ async def cmd_stop(ctx: CommandContext) -> OutboundMessage:
     content = f"Stopped {total} task(s)." if total else "No active task to stop."
     return OutboundMessage(
         channel=msg.channel, chat_id=msg.chat_id, content=content,
+        metadata=dict(msg.metadata or {})
+    )
+
+
+async def cmd_close(ctx: CommandContext) -> OutboundMessage:
+    """Shutdown the bot gracefully."""
+    import signal
+    msg = ctx.msg
+
+    async def _do_close():
+        await asyncio.sleep(0.5)
+        os.kill(os.getpid(), signal.SIGINT)
+
+    asyncio.create_task(_do_close())
+    return OutboundMessage(
+        channel=msg.channel, chat_id=msg.chat_id, content="Shutting down...",
         metadata=dict(msg.metadata or {})
     )
 
@@ -320,6 +337,7 @@ def build_help_text() -> str:
         "/new — Start a new conversation",
         "/stop — Stop the current task",
         "/restart — Restart the bot",
+        "/close — Shutdown the bot",
         "/status — Show bot status",
         "/dream — Manually trigger Dream consolidation",
         "/dream-log — Show what the last Dream changed",
@@ -333,6 +351,7 @@ def register_builtin_commands(router: CommandRouter) -> None:
     """Register the default set of slash commands."""
     router.priority("/stop", cmd_stop)
     router.priority("/restart", cmd_restart)
+    router.priority("/close", cmd_close)
     router.priority("/status", cmd_status)
     router.exact("/new", cmd_new)
     router.exact("/status", cmd_status)
